@@ -14,11 +14,16 @@ https://SEU-USUARIO.github.io/anotacoes/faculdade/calculo      ← também funci
 | Onde | O quê |
 |------|-------|
 | Repositório **`anotacoes`** (público) | O site: `index.html`, `app.js`, `styles.css`, `404.html`. Publicado pelo GitHub Pages. |
-| Repositório **`anotacoes-dados`** (privado) | As anotações, em `notas/<nome>.md`. Cada salvamento é um commit. |
+| Repositório **`anotacoes-dados`** (privado) | As anotações 🔒 **só eu vejo**, em `notas/<nome>.md`. Cada salvamento é um commit. |
+| Repositório **`anotacoes-publicas`** (público, opcional) | As anotações 🌐 **qualquer um vê**, no mesmo formato. Os visitantes do site leem daqui, sem token. |
 
 O site conversa direto com a API do GitHub usando um token que fica guardado **só no seu navegador**. Sem token, o site funciona em **modo local** (anotações só naquele navegador). Quando você conectar depois, ele oferece enviar essas notas para o GitHub.
 
 ## Recursos
+
+- **Quem pode ver**: cada página tem um botão **🔒 Só eu vejo / 🌐 Qualquer um vê**. Toda página nova começa como *só eu*. Ao trocar, o arquivo é movido de um repositório para o outro.
+  - Quem abre o site **sem token** vê só as páginas públicas, em modo *somente leitura*, e pode criar as próprias anotações locais.
+  - Uma página que já foi pública continua no **histórico** do repositório público, mesmo depois de voltar a ser privada.
 
 - **Endereço por anotação**: `#/nome`, com pastas (`#/faculdade/calculo`, `#/sites/ler-depois`). Acentos e espaços são normalizados (`Cálculo I` → `calculo-i`).
 - **Salvamento automático** 1,2 s depois de parar de digitar (ou `Ctrl+S`).
@@ -50,16 +55,18 @@ No GitHub: **Settings → Pages → Source: Deploy from a branch → `main` / `(
 
 Crie `anotacoes-dados` como **privado** e marque **Add a README** (o repositório precisa ter pelo menos um commit).
 
+Para ter páginas públicas, crie também `anotacoes-publicas` como **público**, do mesmo jeito (com README). Sem ele, todas as páginas ficam privadas.
+
 ### 3. Token
 
 1. https://github.com/settings/personal-access-tokens/new (token *fine-grained*)
-2. **Repository access → Only select repositories →** `anotacoes-dados`
+2. **Repository access → Only select repositories →** `anotacoes-dados` e `anotacoes-publicas`
 3. **Permissions → Repository permissions → Contents: Read and write**
 4. Gere e copie o token.
 
 ### 4. Conectar
 
-Abra o site, clique em **⚙** e preencha usuário, `anotacoes-dados`, branch `main` e o token. Repita isso uma vez em cada aparelho (computador, celular…).
+Abra o site, clique em **⚙** e preencha usuário, `anotacoes-dados`, `anotacoes-publicas` (ou deixe vazio), branch `main` e o token. Repita isso uma vez em cada aparelho (computador, celular…).
 
 > **Segurança:** o token fica no `localStorage` do navegador. Use um token *fine-grained* limitado ao repositório de dados. Assim, mesmo que ele vaze, só dá acesso às anotações. Não configure o token em computadores públicos. Se precisar, clique em **⚙ → Usar só neste navegador** para removê-lo.
 

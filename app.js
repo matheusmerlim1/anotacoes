@@ -33,7 +33,7 @@ const LS = {
   },
 };
 
-let cfg = Object.assign({ owner: '', repo: '', branch: 'main', token: '' }, LS.get('anot:cfg', {}));
+let cfg = Object.assign({ owner: '', repo: '', repoPub: 'anotacoes-publicas', branch: 'main', token: '' }, LS.get('anot:cfg', {}));
 
 /* ---------- utilidades ---------- */
 
@@ -93,15 +93,23 @@ class ErroApi extends Error {
   constructor(msg, status) { super(msg); this.status = status; }
 }
 
-const github = {
+// Identificador de versão para leituras sem token (raw não informa o sha do blob).
+function resumo(texto) {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h * 33) ^ texto.charCodeAt(i)) >>> 0;
+  return `raw:${h.toString(36)}:${texto.length}`;
+}
+
+// alvo() devolve { owner, repo, branch, token }. Sem token, só leitura de repositório público.
+function criarGithub(alvo) { return {
   local: false,
-  url(p) { return `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}${p}`; },
+  url(p) { const a = alvo(); return `https://api.github.com/repos/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.repo)}${p}`; },
   async req(p, opts = {}) {
     const headers = {
       Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${cfg.token}`,
       'X-GitHub-Api-Version': '2022-11-28',
     };
+    if (alvo().token) headers.Authorization = `Bearer ${alvo().token}`;
     if (opts.body) headers['Content-Type'] = 'application/json';
     const r = await fetch(this.url(p), { ...opts, headers, cache: 'no-store' });
     if (!r.ok) {
@@ -112,9 +120,19 @@ const github = {
     return r.status === 204 ? null : r.json();
   },
   caminho(id) { return `${PASTA}/${id}.md`.split('/').map(encodeURIComponent).join('/'); },
+  // Visitantes leem pelo raw.githubusercontent.com, que não gasta o limite de 60 chamadas/h da API.
+  async lerRaw(id) {
+    const a = alvo();
+    const r = await fetch(`https://raw.githubusercontent.com/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.repo)}/${encodeURIComponent(a.branch)}/${this.caminho(id)}`, { cache: 'no-store' });
+    if (r.status === 404) return { texto: '', sha: null };
+    if (!r.ok) throw new ErroApi(r.statusText, r.status);
+    const texto = await r.text();
+    return { texto, sha: resumo(texto) };
+  },
   async ler(id) {
+    if (!alvo().token) return this.lerRaw(id);
     try {
-      const d = await this.req(`/contents/${this.caminho(id)}?ref=${encodeURIComponent(cfg.branch)}`);
+      const d = await this.req(`/contents/${this.caminho(id)}?ref=${encodeURIComponent(alvo().branch)}`);
       return { texto: b64dec(d.content), sha: d.sha };
     } catch (e) {
       if (e.status === 404) {
@@ -126,7 +144,7 @@ const github = {
     }
   },
   async salvar(id, texto, sha) {
-    const body = { message: `${sha ? 'Atualiza' : 'Cria'} ${id}`, content: b64enc(texto), branch: cfg.branch };
+    const body = { message: `${sha ? 'Atualiza' : 'Cria'} ${id}`, content: b64enc(texto), branch: alvo().branch };
     if (sha) body.sha = sha;
     try {
       const d = await this.req(`/contents/${this.caminho(id)}`, { method: 'PUT', body: JSON.stringify(body) });
@@ -139,12 +157,12 @@ const github = {
   async excluir(id, sha) {
     await this.req(`/contents/${this.caminho(id)}`, {
       method: 'DELETE',
-      body: JSON.stringify({ message: `Exclui ${id}`, sha, branch: cfg.branch }),
+      body: JSON.stringify({ message: `Exclui ${id}`, sha, branch: alvo().branch }),
     });
   },
   async listar() {
     try {
-      const d = await this.req(`/git/trees/${encodeURIComponent(cfg.branch)}?recursive=1`);
+      const d = await this.req(`/git/trees/${encodeURIComponent(alvo().branch)}?recursive=1`);
       return d.tree
         .filter((t) => t.type === 'blob' && t.path.startsWith(PASTA + '/') && t.path.endsWith('.md'))
         .map((t) => ({ id: t.path.slice(PASTA.length + 1, -3), sha: t.sha }));
@@ -154,10 +172,21 @@ const github = {
     }
   },
   async lerConteudo(item) {
+    if (!alvo().token) return (await this.lerRaw(item.id)).texto;
     const d = await this.req(`/git/blobs/${item.sha}`);
     return b64dec(d.content);
   },
-};
+}; }
+
+// Dono das páginas públicas: o usuário configurado ou, para visitantes, o dono do site (<dono>.github.io).
+function donoPublico() {
+  if (cfg.owner) return cfg.owner;
+  const h = location.hostname;
+  return h.endsWith('.github.io') ? h.slice(0, -'.github.io'.length) : '';
+}
+
+const github = criarGithub(() => cfg);   // anotações privadas ("só eu")
+const publico = criarGithub(() => ({ owner: donoPublico(), repo: cfg.repoPub, branch: cfg.branch || 'main', token: cfg.token }));
 
 const local = {
   local: true,
@@ -181,13 +210,88 @@ const local = {
 };
 
 function conectado() { return Boolean(cfg.token && cfg.owner && cfg.repo); }
-function backend() { return conectado() ? github : local; }
+function temPublico() { return Boolean(cfg.repoPub && donoPublico()); }
+
+// Junta as listas; se o mesmo nome existir nos dois lugares, vale o primeiro.
+function juntar(primeira, segunda) {
+  const ids = new Set(primeira.map((it) => it.id));
+  return primeira.concat(segunda.filter((it) => !ids.has(it.id)));
+}
+
+// Conectado: privadas no repositório de dados, públicas no repositório público.
+const nuvem = {
+  local: false,
+  repo(pub) { return pub ? publico : github; },
+  async listar() {
+    const [priv, pubs] = await Promise.all([
+      github.listar(),
+      temPublico() ? publico.listar() : [],
+    ]);
+    return juntar(priv.map((it) => ({ ...it, pub: false })), pubs.map((it) => ({ ...it, pub: true })));
+  },
+  async ler(id) {
+    const r = await github.ler(id);
+    if (r.sha || !temPublico()) return { ...r, pub: false };
+    try {
+      const p = await publico.ler(id);
+      if (p.sha) return { ...p, pub: true };
+    } catch (e) {
+      if (e.status !== 404) throw e; // repositório público ainda não criado
+    }
+    return { ...r, pub: false };
+  },
+  salvar(id, texto, sha, pub) { return this.repo(pub).salvar(id, texto, sha); },
+  excluir(id, sha, pub) { return this.repo(pub).excluir(id, sha); },
+  lerConteudo(item) { return this.repo(item.pub).lerConteudo(item); },
+  // Copia para o outro repositório e apaga do atual. Devolve o sha novo.
+  async mover(id, texto, sha, paraPub) {
+    const destino = this.repo(paraPub);
+    const ja = await destino.ler(id);
+    // mesmo texto = sobra de uma mudança anterior que não chegou a apagar a origem
+    if (ja.sha && ja.texto !== texto) {
+      throw new Error(`Já existe uma página ${paraPub ? 'pública' : 'privada'} chamada "${id}".`);
+    }
+    const novo = ja.sha || await destino.salvar(id, texto, null);
+    if (sha) await this.repo(!paraPub).excluir(id, sha);
+    return novo;
+  },
+};
+
+// Sem token: páginas públicas do dono do site (só leitura) + anotações deste navegador.
+const visitante = {
+  local: true,
+  async listar() {
+    const locais = (await local.listar()).map((it) => ({ ...it, pub: false }));
+    if (!temPublico()) return locais;
+    let pubs = [];
+    try { pubs = await publico.listar(); }
+    catch (e) { if (e.status !== 404) toast('Não foi possível carregar as páginas públicas: ' + msgErro(e), 4000); }
+    return juntar(pubs.map((it) => ({ ...it, pub: true })), locais);
+  },
+  async ler(id) {
+    if (temPublico()) {
+      try {
+        const p = await publico.ler(id);
+        if (p.sha) return { ...p, pub: true, somenteLeitura: true };
+      } catch { /* sem internet ou sem repositório público: segue com a local */ }
+    }
+    return { ...(await local.ler(id)), pub: false };
+  },
+  salvar(id, texto, sha) { return local.salvar(id, texto, sha); },
+  excluir(id) { return local.excluir(id); },
+  lerConteudo(item) { return item.pub ? publico.lerConteudo(item) : local.lerConteudo(item); },
+};
+
+function backend() { return conectado() ? nuvem : visitante; }
 
 /* ---------- estado ---------- */
 
 const est = {
   id: null,          // página aberta
   sha: null,         // versão remota que o editor tem como base
+  pub: false,        // página pública (qualquer um lê) ou só do dono
+  somenteLeitura: false, // visitante vendo uma página pública
+  movendo: false,    // mudando a visibilidade
   remoto: '',        // texto salvo dessa versão
   carregando: false,
   salvando: null,    // Promise do salvamento em andamento
@@ -205,7 +309,7 @@ const editor = $('#editor');
 const leitura = $('#leitura');
 
 const chaveRasc = (id) => 'anot:rasc:' + id;
-const sujo = () => est.id !== null && !est.carregando && editor.value !== est.remoto;
+const sujo = () => est.id !== null && !est.carregando && !est.somenteLeitura && editor.value !== est.remoto;
 
 /* ---------- rotas ---------- */
 
@@ -285,6 +389,10 @@ function nomeComPasta(id, prefixo = '') {
   return i < 0 ? esc(rel) : `<span class="pasta">${esc(rel.slice(0, i + 1))}</span>${esc(rel.slice(i + 1))}`;
 }
 
+function selo(it) {
+  return it.pub ? '<span class="selo" title="Pública: qualquer pessoa pode ler">🌐</span>' : '';
+}
+
 function trecho(texto, termo) {
   const i = texto.toLowerCase().indexOf(termo);
   if (i < 0) return '';
@@ -344,7 +452,7 @@ async function renderLista(forcar = false) {
     const texto = noConteudo ? (textos.get(it.sha) || '') : '';
     const noTexto = noConteudo && texto.toLowerCase().includes(termo);
     if (!noNome && !noTexto) continue;
-    itens.push(`<li><a href="#/${esc(it.id)}">${nomeComPasta(it.id)}${noTexto ? trecho(texto, termo) : ''}</a></li>`);
+    itens.push(`<li><a href="#/${esc(it.id)}">${selo(it)}${nomeComPasta(it.id)}${noTexto ? trecho(texto, termo) : ''}</a></li>`);
   }
 
   ul.innerHTML = itens.join('');
@@ -371,13 +479,15 @@ function renderMigalhas(id) {
 
 async function abrirNota(id) {
   const minha = ++est.seq;
-  Object.assign(est, { id, sha: null, remoto: '', carregando: true, erro: null, conflito: false });
+  Object.assign(est, { id, sha: null, remoto: '', pub: false, somenteLeitura: false, carregando: true, erro: null, conflito: false });
   document.title = `${id} · Anotações`;
   mostrarTela('nota');
   renderMigalhas(id);
   esconderBanner();
   editor.value = '';
   editor.disabled = true;
+  editor.readOnly = false;
+  renderVisibilidade();
   aplicarModo();
   atualizarStatus();
   $('#bloco-sub').hidden = true;
@@ -400,12 +510,16 @@ async function abrirNota(id) {
 
   est.sha = r.sha;
   est.remoto = r.texto;
+  est.pub = Boolean(r.pub);
+  est.somenteLeitura = Boolean(r.somenteLeitura);
   est.carregando = false;
   if (r.sha) registrarRecente(id);
   editor.value = r.texto;
   editor.disabled = false;
+  editor.readOnly = est.somenteLeitura;
+  renderVisibilidade();
 
-  const rasc = LS.get(chaveRasc(id));
+  const rasc = est.somenteLeitura ? null : LS.get(chaveRasc(id));
   if (rasc && rasc.texto !== r.texto) {
     if ((rasc.base || null) === (r.sha || null)) {
       // edição que não chegou a ser salva (aba fechada, sem internet…): retoma
@@ -436,13 +550,15 @@ async function renderSubpaginas(id, minha) {
   const filhos = lista.filter((it) => it.id.startsWith(prefixo));
   $('#bloco-sub').hidden = filhos.length === 0;
   $('#lista-sub').innerHTML = filhos
-    .map((it) => `<li><a href="#/${esc(it.id)}">${nomeComPasta(it.id, prefixo)}</a></li>`).join('');
+    .map((it) => `<li><a href="#/${esc(it.id)}">${selo(it)}${nomeComPasta(it.id, prefixo)}</a></li>`).join('');
 }
 
 function atualizarStatus() {
   const el = $('#status');
   let texto, tipo = 'ok';
   if (est.carregando) { texto = 'Carregando…'; tipo = 'vazio'; }
+  else if (est.somenteLeitura) { texto = 'Somente leitura'; tipo = 'vazio'; }
+  else if (est.movendo) { texto = 'Mudando visibilidade…'; tipo = 'pendente'; }
   else if (est.conflito) { texto = 'Conflito'; tipo = 'erro'; }
   else if (est.salvando) { texto = 'Salvando…'; tipo = 'pendente'; }
   else if (est.erro && est.id) { texto = sujo() ? 'Não salvo — tentando de novo' : 'Erro'; tipo = 'erro'; }
@@ -452,11 +568,11 @@ function atualizarStatus() {
   el.textContent = texto;
   el.dataset.tipo = tipo;
   el.title = est.erro || '';
-  $('#btn-excluir').disabled = !est.sha;
+  $('#btn-excluir').disabled = !est.sha || est.somenteLeitura || est.movendo;
 }
 
 function aoDigitar() {
-  if (!est.id || est.carregando) return;
+  if (!est.id || est.carregando || est.somenteLeitura) return;
   LS.set(chaveRasc(est.id), { texto: editor.value, base: est.sha, ts: Date.now() });
   atualizarStatus();
   agendarSalvar();
@@ -470,13 +586,13 @@ function agendarSalvar(ms = ESPERA_SALVAR) {
 function salvarAgora() {
   clearTimeout(est.timer);
   if (est.salvando) { est.pendente = true; return est.salvando; }
-  if (!sujo() || est.conflito) { atualizarStatus(); return Promise.resolve(); }
+  if (!sujo() || est.conflito || est.movendo) { atualizarStatus(); return Promise.resolve(); }
 
   const id = est.id;
   const texto = editor.value;
   est.salvando = (async () => {
     try {
-      const sha = await backend().salvar(id, texto, est.sha);
+      const sha = await backend().salvar(id, texto, est.sha, est.pub);
       est.erro = null;
       est.lista = null;
       const rasc = LS.get(chaveRasc(id));
@@ -513,8 +629,10 @@ function mostrarConflito() {
         if (est.id !== id) return;
         est.sha = r.sha;
         est.remoto = r.texto;
+        est.pub = Boolean(r.pub);
         est.conflito = false;
         esconderBanner();
+        renderVisibilidade();
         salvarAgora();
       } catch (e) { toast(msgErro(e), 4000); }
     }],
@@ -524,10 +642,11 @@ function mostrarConflito() {
         const r = await backend().ler(id);
         if (est.id !== id) return;
         await copiar(minha, 'Seu texto foi copiado para a área de transferência.');
-        Object.assign(est, { sha: r.sha, remoto: r.texto, conflito: false, erro: null });
+        Object.assign(est, { sha: r.sha, remoto: r.texto, pub: Boolean(r.pub), conflito: false, erro: null });
         editor.value = r.texto;
         LS.del(chaveRasc(id));
         esconderBanner();
+        renderVisibilidade();
         atualizarStatus();
         renderLeitura();
       } catch (e) { toast(msgErro(e), 4000); }
@@ -553,14 +672,16 @@ function esconderBanner() { $('#banner').hidden = true; }
 
 // Recarrega a página aberta se ela mudou em outro aparelho e não há edição local.
 async function sincronizarSeLimpo() {
-  if (!est.id || est.carregando || est.salvando || est.conflito || sujo()) return;
+  if (!est.id || est.carregando || est.salvando || est.movendo || est.conflito || sujo()) return;
   const id = est.id;
   const minha = est.seq;
   try {
     const r = await backend().ler(id);
-    if (minha !== est.seq || sujo() || est.salvando || r.sha === est.sha) return;
-    Object.assign(est, { sha: r.sha, remoto: r.texto });
+    if (minha !== est.seq || sujo() || est.salvando || est.movendo || r.sha === est.sha) return;
+    Object.assign(est, { sha: r.sha, remoto: r.texto, pub: Boolean(r.pub), somenteLeitura: Boolean(r.somenteLeitura) });
     editor.value = r.texto;
+    editor.readOnly = est.somenteLeitura;
+    renderVisibilidade();
     renderLeitura();
     atualizarStatus();
     toast('Página atualizada com a versão mais recente.');
@@ -614,14 +735,72 @@ async function copiar(texto, msg) {
   catch { toast('Não foi possível copiar automaticamente.'); }
 }
 
+/* ---------- visibilidade ---------- */
+
+function renderVisibilidade() {
+  const b = $('#btn-visib');
+  // visitante: só mostra o selo nas páginas públicas; dono: mostra se há repositório público
+  b.hidden = est.somenteLeitura ? false : !(conectado() && temPublico());
+  b.disabled = est.carregando || est.somenteLeitura || est.movendo;
+  b.dataset.pub = est.pub ? '1' : '0';
+  b.textContent = est.somenteLeitura ? '🌐 Pública' : est.pub ? '🌐 Qualquer um vê' : '🔒 Só eu vejo';
+  b.title = est.somenteLeitura
+    ? 'Página pública do dono do site (somente leitura)'
+    : est.pub ? 'Pública: qualquer pessoa com o site pode ler. Clique para deixar só para você.'
+      : 'Privada: só você vê. Clique para deixar pública.';
+}
+
+async function alternarVisibilidade() {
+  if (!est.id || est.carregando || est.somenteLeitura || est.movendo || est.conflito) return;
+  const paraPub = !est.pub;
+  if (paraPub && !confirm(`Tornar "${est.id}" pública?\n\nQualquer pessoa que abrir o site poderá ler esta página, e ela aparece na lista para visitantes.\n\nMesmo que você volte a deixá-la privada depois, o texto continua no histórico do repositório público "${cfg.repoPub}".`)) return;
+
+  clearTimeout(est.timer);
+  if (est.salvando) await est.salvando.catch(() => {});
+
+  if (!est.sha) {
+    // página ainda não salva: basta decidir para onde ela vai
+    est.pub = paraPub;
+    renderVisibilidade();
+    if (sujo()) salvarAgora();
+    return;
+  }
+  if (sujo()) await salvarAgora();
+  if (sujo() || est.conflito || est.erro) { toast('Salve a página antes de mudar a visibilidade.', 4000); return; }
+
+  const id = est.id;
+  est.movendo = true;
+  editor.readOnly = true;
+  renderVisibilidade();
+  atualizarStatus();
+  try {
+    const sha = await backend().mover(id, est.remoto, est.sha, paraPub);
+    est.lista = null;
+    if (est.id === id) {
+      est.sha = sha;
+      est.pub = paraPub;
+      const rasc = LS.get(chaveRasc(id));
+      if (rasc) LS.set(chaveRasc(id), { ...rasc, base: sha });
+    }
+    toast(paraPub ? 'Pronto: qualquer pessoa pode ler esta página.' : 'Pronto: só você vê esta página.');
+  } catch (e) {
+    toast('Não foi possível mudar a visibilidade: ' + (e instanceof ErroApi ? msgErro(e) : e.message), 5000);
+  } finally {
+    est.movendo = false;
+    if (est.id === id) editor.readOnly = false;
+    renderVisibilidade();
+    atualizarStatus();
+  }
+}
+
 async function excluirNota() {
   const id = est.id;
-  if (!id || !est.sha) return;
+  if (!id || !est.sha || est.somenteLeitura || est.movendo) return;
   if (!confirm(`Excluir a página "${id}"?${backend().local ? '' : '\n\n(O conteúdo continua no histórico de commits do repositório.)'}`)) return;
   clearTimeout(est.timer);
   try {
     if (est.salvando) await est.salvando;
-    await backend().excluir(id, est.sha);
+    await backend().excluir(id, est.sha, est.pub);
   } catch (e) {
     toast('Não foi possível excluir: ' + msgErro(e), 4000);
     return;
@@ -639,6 +818,7 @@ async function excluirNota() {
 function abrirConfig() {
   $('#cfg-owner').value = cfg.owner;
   $('#cfg-repo').value = cfg.repo;
+  $('#cfg-repo-pub').value = cfg.repoPub;
   $('#cfg-branch').value = cfg.branch || 'main';
   $('#cfg-token').value = cfg.token;
   $('#cfg-msg').hidden = true;
@@ -657,6 +837,7 @@ async function salvarConfig(ev) {
   const novo = {
     owner: $('#cfg-owner').value.trim(),
     repo: $('#cfg-repo').value.trim().replace(/\.git$/, ''),
+    repoPub: $('#cfg-repo-pub').value.trim().replace(/\.git$/, ''),
     branch: $('#cfg-branch').value.trim() || 'main',
     token: $('#cfg-token').value.trim(),
   };
@@ -670,6 +851,17 @@ async function salvarConfig(ev) {
   try {
     const repo = await github.req('');
     if (repo.permissions && !repo.permissions.push) throw new Error('O token só tem permissão de leitura. Dê "Contents: Read and write".');
+    if (novo.repoPub) {
+      if (novo.repoPub === novo.repo) throw new Error('O repositório público precisa ser diferente do repositório dos dados.');
+      let pub;
+      try { pub = await publico.req(''); }
+      catch (e) {
+        if (e.status === 404) throw new Error(`Repositório público "${novo.repoPub}" não encontrado. Crie-o como público e dê acesso a ele no token, ou deixe o campo vazio.`);
+        throw e;
+      }
+      if (pub.private) throw new Error(`"${novo.repoPub}" está privado: os visitantes não conseguiriam ler. Deixe-o público ou use outro.`);
+      if (pub.permissions && !pub.permissions.push) throw new Error(`O token não pode gravar em "${novo.repoPub}". Inclua esse repositório no token com "Contents: Read and write".`);
+    }
   } catch (e) {
     cfg = anterior;
     msgConfig(e instanceof ErroApi ? msgErro(e) : e.message, true);
@@ -742,6 +934,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 $('#btn-modo').addEventListener('click', alternarModo);
+$('#btn-visib').addEventListener('click', alternarVisibilidade);
 $('#btn-link').addEventListener('click', () => copiar(location.href, 'Link copiado.'));
 $('#btn-excluir').addEventListener('click', excluirNota);
 

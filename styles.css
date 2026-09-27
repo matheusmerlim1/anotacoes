@@ -203,6 +203,7 @@ main {
 }
 .lista a:hover { background: var(--destaque-fraco); }
 .lista .pasta { color: var(--suave); }
+.lista .selo { margin-right: .4rem; font-size: .85em; }
 .lista .trecho {
   display: block;
   font-family: var(--fonte);
@@ -250,6 +251,10 @@ main {
 .status[data-tipo="pendente"]::before { background: #d49a1f; }
 .status[data-tipo="erro"]::before { background: var(--perigo); }
 .status[data-tipo="vazio"]::before { background: var(--borda); }
+
+.visib { white-space: nowrap; }
+.visib[data-pub="1"] { background: var(--destaque-fraco); border-color: var(--destaque); }
+.visib:disabled { opacity: 1; cursor: default; }
 
 .banner {
   background: var(--aviso);

@@ -56,6 +56,7 @@
         <nav id="migalhas" class="migalhas" aria-label="Caminho"></nav>
         <div class="acoes">
           <span id="status" class="status" aria-live="polite"></span>
+          <button id="btn-visib" type="button" class="visib" hidden>🔒 Só eu vejo</button>
           <button id="btn-modo" type="button">Ler</button>
           <button id="btn-link" type="button">Copiar link</button>
           <button id="btn-excluir" type="button" class="perigo">Excluir</button>
@@ -91,13 +92,17 @@
       <label>Repositório dos dados
         <input id="cfg-repo" type="text" placeholder="anotacoes-dados" spellcheck="false" required>
       </label>
+      <label>Repositório das páginas públicas (opcional)
+        <input id="cfg-repo-pub" type="text" placeholder="anotacoes-publicas" spellcheck="false">
+      </label>
+      <p class="dica">Um repositório <strong>público</strong>, separado do dos dados. As páginas marcadas como “🌐 Qualquer um vê” vão para ele e qualquer visitante do site pode lê-las. As marcadas como “🔒 Só eu vejo” continuam no repositório privado. Deixe vazio para ter só páginas privadas.</p>
       <label>Branch
         <input id="cfg-branch" type="text" placeholder="main" spellcheck="false">
       </label>
       <label>Token de acesso
         <input id="cfg-token" type="password" placeholder="github_pat_…" spellcheck="false" autocomplete="off" required>
       </label>
-      <p class="dica">Crie um <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">token fine-grained</a> com acesso só ao repositório dos dados e a permissão <strong>Contents: Read and write</strong>. O token fica guardado apenas neste navegador.</p>
+      <p class="dica">Crie um <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">token fine-grained</a> com acesso só ao repositório dos dados (e ao das páginas públicas, se usar) e a permissão <strong>Contents: Read and write</strong>. O token fica guardado apenas neste navegador.</p>
 
       <p id="cfg-msg" class="msg" hidden></p>
 
