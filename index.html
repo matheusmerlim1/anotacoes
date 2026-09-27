@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anotações</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topo">
+    <a href="#/" class="marca">📝 <span>Anotações</span></a>
+    <form id="form-ir" class="ir" autocomplete="off">
+      <input id="ir-input" type="text" placeholder="ir para… ex: faculdade/calculo" spellcheck="false" aria-label="Ir para a anotação">
+    </form>
+    <button id="btn-config" class="icone" type="button" title="Configurações" aria-label="Configurações">⚙</button>
+  </header>
+
+  <div id="faixa-local" class="faixa" hidden>
+    <span>Modo local: as anotações ficam só neste navegador.</span>
+    <button type="button" class="link" data-abrir-config>Conectar ao GitHub</button>
+  </div>
+
+  <main>
+    <!-- Tela inicial -->
+    <section id="tela-inicio" hidden>
+      <h1>Suas anotações</h1>
+      <p class="sub">Digite um nome para abrir ou criar uma página. Use <code>/</code> para organizar em pastas, ex: <code>faculdade/calculo</code> ou <code>sites/ler-depois</code>.</p>
+
+      <form id="form-novo" class="novo" autocomplete="off">
+        <span class="prefixo">#/</span>
+        <input id="novo-input" type="text" placeholder="nome-da-pagina" spellcheck="false" aria-label="Nome da página">
+        <button type="submit" class="primario">Abrir</button>
+      </form>
+
+      <div id="bloco-recentes" hidden>
+        <h2>Recentes</h2>
+        <ul id="lista-recentes" class="chips"></ul>
+      </div>
+
+      <div class="lista-cab">
+        <h2>Todas <span id="contagem" class="contagem"></span></h2>
+        <div class="filtros">
+          <input id="filtro" type="search" placeholder="Filtrar…" aria-label="Filtrar anotações">
+          <label class="check"><input id="filtro-conteudo" type="checkbox"> buscar no conteúdo</label>
+          <button id="btn-atualizar" type="button" class="icone" title="Atualizar lista" aria-label="Atualizar lista">↻</button>
+        </div>
+      </div>
+      <ul id="lista-notas" class="lista"></ul>
+      <p id="lista-msg" class="msg" hidden></p>
+    </section>
+
+    <!-- Tela da anotação -->
+    <section id="tela-nota" hidden>
+      <div class="nota-cab">
+        <nav id="migalhas" class="migalhas" aria-label="Caminho"></nav>
+        <div class="acoes">
+          <span id="status" class="status" aria-live="polite"></span>
+          <button id="btn-modo" type="button">Ler</button>
+          <button id="btn-link" type="button">Copiar link</button>
+          <button id="btn-excluir" type="button" class="perigo">Excluir</button>
+        </div>
+      </div>
+
+      <div id="banner" class="banner" hidden>
+        <p id="banner-texto"></p>
+        <div id="banner-botoes" class="banner-botoes"></div>
+      </div>
+
+      <textarea id="editor" spellcheck="true" placeholder="Comece a escrever… o texto é salvo sozinho."></textarea>
+      <div id="leitura" class="leitura" hidden></div>
+
+      <div id="bloco-sub" hidden>
+        <h2>Subpáginas</h2>
+        <ul id="lista-sub" class="lista"></ul>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <!-- Configurações -->
+  <dialog id="dlg-config">
+    <form id="form-config" method="dialog">
+      <h2>Conectar ao GitHub</h2>
+      <p class="sub">As anotações são salvas como arquivos <code>.md</code> em um repositório seu. Recomendado: um repositório <strong>privado</strong> só para os dados.</p>
+
+      <label>Usuário ou organização
+        <input id="cfg-owner" type="text" placeholder="matheusmerlim1" spellcheck="false" required>
+      </label>
+      <label>Repositório dos dados
+        <input id="cfg-repo" type="text" placeholder="anotacoes-dados" spellcheck="false" required>
+      </label>
+      <label>Branch
+        <input id="cfg-branch" type="text" placeholder="main" spellcheck="false">
+      </label>
+      <label>Token de acesso
+        <input id="cfg-token" type="password" placeholder="github_pat_…" spellcheck="false" autocomplete="off" required>
+      </label>
+      <p class="dica">Crie um <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">token fine-grained</a> com acesso só ao repositório dos dados e a permissão <strong>Contents: Read and write</strong>. O token fica guardado apenas neste navegador.</p>
+
+      <p id="cfg-msg" class="msg" hidden></p>
+
+      <div class="dlg-botoes">
+        <button id="cfg-local" type="button" class="link">Usar só neste navegador</button>
+        <span class="espaco"></span>
+        <button type="button" data-fechar>Cancelar</button>
+        <button id="cfg-salvar" type="submit" class="primario" value="salvar">Testar e salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Anotações</title>
+  <script>
+    // O GitHub Pages serve este arquivo para qualquer endereço que não existe.
+    // Converte  /anotacoes/faculdade/calculo  em  /anotacoes/#/faculdade/calculo
+    (function () {
+      var partes = location.pathname.split('/').filter(Boolean);
+      // Em usuario.github.io/<repositorio>/ o 1º segmento é o nome do repositório.
+      // Se usar domínio próprio ou o repositório usuario.github.io, troque para 0.
+      var segmentosBase = /\.github\.io$/i.test(location.hostname) ? 1 : 0;
+      var base = '/' + partes.slice(0, segmentosBase).join('/');
+      if (base.length > 1) base += '/';
+      var rota = partes.slice(segmentosBase).join('/');
+      location.replace(base + (rota ? '#/' + rota : ''));
+    })();
+  </script>
+</head>
+<body></body>
+</html>
