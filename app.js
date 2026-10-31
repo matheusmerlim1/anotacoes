@@ -481,6 +481,7 @@ async function abrirNota(id) {
   const minha = ++est.seq;
   Object.assign(est, { id, sha: null, remoto: '', pub: false, somenteLeitura: false, carregando: true, erro: null, conflito: false });
   document.title = `${id} · Anotações`;
+  $('#nota-titulo').textContent = `Anotação ${id}`;
   mostrarTela('nota');
   renderMigalhas(id);
   esconderBanner();
@@ -702,7 +703,8 @@ function linkificar(texto) {
     out += esc(texto.slice(ult, m.index));
     const href = url.startsWith('www.') ? 'https://' + url : url;
     const externo = !url.startsWith('#');
-    out += `<a href="${esc(href)}"${externo ? ' target="_blank" rel="noopener noreferrer"' : ''}>${esc(url)}</a>`;
+    // links externos abrem em outra aba: avisa o leitor de tela (WCAG 3.2.5 / G201)
+    out += `<a href="${esc(href)}"${externo ? ' target="_blank" rel="noopener noreferrer"' : ''}>${esc(url)}${externo ? '<span class="so-leitor"> (abre em nova aba)</span>' : ''}</a>`;
     ult = m.index + url.length;
   }
   return out + esc(texto.slice(ult));
@@ -960,6 +962,15 @@ document.querySelectorAll('[data-abrir-config]').forEach((b) => b.addEventListen
 $('#form-config').addEventListener('submit', salvarConfig);
 $('#cfg-local').addEventListener('click', usarLocal);
 document.querySelector('#dlg-config [data-fechar]').addEventListener('click', () => $('#dlg-config').close());
+
+// "Pular para o conteúdo": as rotas usam o hash, então #conteudo abriria uma anotação
+// com esse nome. Move o foco para o <main> sem mexer no endereço.
+$('.pular').addEventListener('click', (e) => {
+  e.preventDefault();
+  const main = $('#conteudo');
+  main.focus();
+  main.scrollIntoView();
+});
 
 window.addEventListener('hashchange', rotear);
 

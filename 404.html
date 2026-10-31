@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Anotações</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Abrindo anotação · Anotações</title>
   <script>
     // O GitHub Pages serve este arquivo para qualquer endereço que não existe.
     // Converte  /anotacoes/faculdade/calculo  em  /anotacoes/#/faculdade/calculo
@@ -14,19 +15,47 @@
       var base = '/' + partes.slice(0, segmentosBase).join('/');
       if (base.length > 1) base += '/';
       var rota = partes.slice(segmentosBase).join('/');
-      location.replace(base + (rota ? '#/' + rota : ''));
+      window.destinoAnotacao = base + (rota ? '#/' + rota : '');
+      location.replace(window.destinoAnotacao);
     })();
   </script>
+  <style>
+    body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f7f5f0; color: #24221e; }
+    main { max-width: 40rem; margin: 0 auto; padding: 3rem 1rem; }
+    h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
+    a { color: #2f6b4f; }
+    a:focus-visible { outline: 2px solid #2f6b4f; outline-offset: 2px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #171816; color: #e9e6df; }
+      a { color: #6cc196; }
+      a:focus-visible { outline-color: #6cc196; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html #mr-portfolio-btn { transition: none; }
+      html #mr-portfolio-btn:hover { transform: none; }
+    }
+  </style>
 </head>
-<body><!-- === Botao de volta ao portfolio - cole antes de </body> === -->
+<body>
+<!-- aparece só por um instante (ou se o redirecionamento falhar): dá um título e um caminho manual -->
+<main>
+  <h1>Abrindo a anotação…</h1>
+  <p>Se nada acontecer, <a id="ir-anotacao" href="./">abra as anotações por aqui</a>.</p>
+</main>
+<script>
+  if (window.destinoAnotacao) document.getElementById('ir-anotacao').href = window.destinoAnotacao;
+</script>
+<!-- === Botao de volta ao portfolio - cole antes de </body> === -->
+<nav aria-label="Portf&oacute;lio">
 <a id="mr-portfolio-btn" href="https://matheusmerlim1.github.io/" target="_blank" rel="noopener"
-   aria-label="Abrir o portf&oacute;lio de Matheus Raposo" title="Ver todos os meus projetos">
+   aria-label="Portf&oacute;lio de Matheus Raposo (abre em nova aba)" title="Ver todos os meus projetos">
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
   </svg>
   <span>Portf&oacute;lio</span>
 </a>
+</nav>
 <style>
 #mr-portfolio-btn {
   position: fixed; top: 12px; right: 12px; z-index: 2147483000;

@@ -5,23 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Anotações</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=20261028">
 </head>
 <body>
+  <a href="#conteudo" class="pular">Pular para o conteúdo</a>
   <header class="topo">
-    <a href="#/" class="marca">📝 <span>Anotações</span></a>
+    <a href="#/" class="marca"><span aria-hidden="true">📝</span> <span class="marca-nome">Anotações</span></a>
     <form id="form-ir" class="ir" autocomplete="off">
       <input id="ir-input" type="text" placeholder="ir para… ex: faculdade/calculo" spellcheck="false" aria-label="Ir para a anotação">
     </form>
     <button id="btn-config" class="icone" type="button" title="Configurações" aria-label="Configurações">⚙</button>
   </header>
 
-  <div id="faixa-local" class="faixa" hidden>
+  <!-- section com nome = landmark "region": o aviso não fica solto fora dos landmarks -->
+  <section id="faixa-local" class="faixa" aria-label="Modo de armazenamento" hidden>
     <span>Modo local: as anotações ficam só neste navegador.</span>
     <button type="button" class="link" data-abrir-config>Conectar ao GitHub</button>
-  </div>
+  </section>
 
-  <main>
+  <main id="conteudo" tabindex="-1">
     <!-- Tela inicial -->
     <section id="tela-inicio" hidden>
       <h1>Suas anotações</h1>
@@ -52,6 +54,8 @@
 
     <!-- Tela da anotação -->
     <section id="tela-nota" hidden>
+      <!-- título da página para leitores de tela; o caminho visível fica nas migalhas -->
+      <h1 id="nota-titulo" class="so-leitor"></h1>
       <div class="nota-cab">
         <nav id="migalhas" class="migalhas" aria-label="Caminho"></nav>
         <div class="acoes">
@@ -68,7 +72,7 @@
         <div id="banner-botoes" class="banner-botoes"></div>
       </div>
 
-      <textarea id="editor" spellcheck="true" placeholder="Comece a escrever… o texto é salvo sozinho."></textarea>
+      <textarea id="editor" spellcheck="true" aria-label="Texto da anotação" placeholder="Comece a escrever… o texto é salvo sozinho."></textarea>
       <div id="leitura" class="leitura" hidden></div>
 
       <div id="bloco-sub" hidden>
@@ -81,9 +85,9 @@
   <div id="toast" class="toast" role="status" hidden></div>
 
   <!-- Configurações -->
-  <dialog id="dlg-config">
+  <dialog id="dlg-config" aria-labelledby="dlg-config-titulo">
     <form id="form-config" method="dialog">
-      <h2>Conectar ao GitHub</h2>
+      <h2 id="dlg-config-titulo">Conectar ao GitHub</h2>
       <p class="sub">As anotações são salvas como arquivos <code>.md</code> em um repositório seu. Recomendado: um repositório <strong>privado</strong> só para os dados.</p>
 
       <label>Usuário ou organização
@@ -102,7 +106,7 @@
       <label>Token de acesso
         <input id="cfg-token" type="password" placeholder="github_pat_…" spellcheck="false" autocomplete="off" required>
       </label>
-      <p class="dica">Crie um <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">token fine-grained</a> com acesso só ao repositório dos dados (e ao das páginas públicas, se usar) e a permissão <strong>Contents: Read and write</strong>. O token fica guardado apenas neste navegador.</p>
+      <p class="dica">Crie um <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">token fine-grained<span class="so-leitor"> (abre em nova aba)</span></a> com acesso só ao repositório dos dados (e ao das páginas públicas, se usar) e a permissão <strong>Contents: Read and write</strong>. O token fica guardado apenas neste navegador.</p>
 
       <p id="cfg-msg" class="msg" hidden></p>
 
@@ -115,16 +119,18 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=20261028"></script>
 <!-- === Botao de volta ao portfolio - cole antes de </body> === -->
+<nav aria-label="Portf&oacute;lio">
 <a id="mr-portfolio-btn" href="https://matheusmerlim1.github.io/" target="_blank" rel="noopener"
-   aria-label="Abrir o portf&oacute;lio de Matheus Raposo" title="Ver todos os meus projetos">
+   aria-label="Portf&oacute;lio de Matheus Raposo (abre em nova aba)" title="Ver todos os meus projetos">
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
   </svg>
   <span>Portf&oacute;lio</span>
 </a>
+</nav>
 <style>
 #mr-portfolio-btn {
   position: fixed; top: 12px; right: 12px; z-index: 2147483000;
